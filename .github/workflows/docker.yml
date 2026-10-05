@@ -1,0 +1,43 @@
+name: Docker build and smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile (hadolint)
+        run: docker run --rm -i hadolint/hadolint:v2.12.0 < Dockerfile
+
+      - name: Build image
+        run: docker build -t practice:ci .
+
+      - name: Run container and wait for healthy
+        run: |
+          docker run -d --name web -p 8080:8080 practice:ci
+          for _ in $(seq 1 20); do
+            status="$(docker inspect -f '{{.State.Health.Status}}' web)"
+            echo "health: $status"
+            [ "$status" = "healthy" ] && break
+            sleep 3
+          done
+          [ "$status" = "healthy" ]
+
+      - name: Smoke test
+        run: |
+          curl -fsS http://127.0.0.1:8080/ | grep -q "Docker Practice"
+          curl -fsS http://127.0.0.1:8080/healthz
+          test "$(docker exec web id -u)" != "0"   # not running as root
+          curl -sI http://127.0.0.1:8080/ | grep -qi "x-content-type-options: nosniff"
+
+      - name: Logs on failure
+        if: failure()
+        run: docker logs web || true

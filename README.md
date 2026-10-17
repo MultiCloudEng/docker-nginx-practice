@@ -1,4 +1,5 @@
 # Docker Practice: Hardened nginx Container
+> Built with AI assistance (Claude).
 
 A small static site served by nginx in a container, built with a few container-security basics: non-root user, health check, pinned base image and security headers.
 
